@@ -1,0 +1,30 @@
+[package]
+name = "nala-halogen-rs"
+version = "0.21.0-nala.1"
+edition = "2024"
+license = "LicenseRef-Halogen-EULA"
+authors = ["Peonist, LLC (Upstream halogen-flash-server)", "Master-MD / NALA Engineering (100% Native Pure Safe Rust Tooling)"]
+description = "100% Native Pure Safe Rust (Edition 2024, #![forbid(unsafe_code)], 0 External Crates, Zero-Python) Tooling, Benchmark, Docs Gate, Site Renderer, Redirect Generator & NALA Cluster Probe for halogen-flash-server (AMD Strix Halo gfx1151)"
+repository = "https://github.com/Master-MD/NALA-halogen-flash-server"
+readme = "README.md"
+keywords = ["llm", "benchmark", "rust", "strix-halo", "rocm"]
+categories = ["command-line-utilities", "development-tools"]
+
+[lib]
+name = "nala_halogen_rs"
+path = "src/lib.rs"
+
+[[bin]]
+name = "nala-halogen-rs"
+path = "src/main.rs"
+
+[dependencies]
+# 100% Pure Rust Standard Library — Zero external crate supply-chain attack surface,
+# instant cross-compilation across macOS (ARM64/x86_64), Linux (x86_64/ARM64), and Windows (x86_64).
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true

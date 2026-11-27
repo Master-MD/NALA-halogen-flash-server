@@ -4,6 +4,11 @@
 
 # halogen-flash-server
 
+> **NALA Zero-Python Rust Fork (`Master-MD/NALA-halogen-flash-server`):**
+> All 7 upstream Python scripts (`tools/*.py`, previously 17.2% Python) have been replaced by **`nala-halogen-rs`**, a 100% Native Pure Safe Rust (Edition 2024, `#![forbid(unsafe_code)]`, 0 external crates, 0.0% Python) binary with daily automated upstream sync from `peonist-ai/halogen-flash-server`. The official upstream container image (`ghcr.io/peonist-ai/halogen-flash-server:0.21.0`) is used unmodified per [LICENSE.md](LICENSE.md) and [TRADEMARKS.md](TRADEMARKS.md).
+>
+> **5-Language NALA Docs:** [Deutsch](docs/nala/README_DE.md) · [English](docs/nala/README_EN.md) · [Francais](docs/nala/README_FR.md) · [Italiano](docs/nala/README_IT.md) · [Rumantsch](docs/nala/README_RM.md) · [FAQ](FAQ.md) · [Caveman Guide](CAVEMAN_GUIDE.md) · [5-Lang License Summary](LICENSE_SUMMARY_5LANG.md)
+
 **halogen™ is the fastest way to run Qwen3.8-Flash-Next on AMD Strix Halo,
 and it is built for agents: deep into a long session, each turn starts
 answering in about 1.2 seconds.**

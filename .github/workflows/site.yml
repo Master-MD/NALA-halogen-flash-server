@@ -5,63 +5,25 @@ on:
     branches: [main]
     paths:
       - "website/**"
-      - "docs/**"
-      - "mkdocs.yml"
-      - "llms.txt"
-      - "README.md"
-      - "tools/check_docs.py"
-      - "tools/deploy-website.sh"
-      - "tools/site_release.py"
       - "CHANGELOG.md"
-      - "overrides/**"
-      - "tools/mkdocs_hooks.py"
+      - "src/site_release.rs"
       - ".github/workflows/site.yml"
   workflow_dispatch:
-    inputs:
-      dry:
-        description: "Dry run: print what a deploy would upload and delete, change nothing"
-        type: boolean
-        default: false
 
 permissions:
   contents: read
-  id-token: write
 
 concurrency:
-  group: site
+  group: site-gate
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  render_site_rust:
+    name: Zero-Python Rust Site Template Gate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: pip install -r docs/requirements.txt
-      - run: python tools/check_docs.py
-      - name: Check the site
-        run: bash tools/deploy-website.sh --check
-      - name: Upload to S3 and invalidate CloudFront
-        env:
-          ROLE_ARN: ${{ secrets.SITE_ROLE_ARN }}
-          SITE_BUCKET: ${{ secrets.SITE_BUCKET }}
-          SITE_DISTRIBUTION: ${{ secrets.SITE_DISTRIBUTION }}
-          AWS_REGION: ${{ vars.SITE_REGION || 'us-east-1' }}
-          MODE: ${{ inputs.dry && 'dry' || '--go' }}
-        run: |
-          set -euo pipefail
-          # GitHub's OIDC token for this run, exchanged for short-lived AWS
-          # credentials; the role trusts this repository's main branch only.
-          token=$(curl -fsS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" | jq -r .value)
-          creds=$(aws sts assume-role-with-web-identity --role-arn "$ROLE_ARN" \
-            --role-session-name "site-$GITHUB_RUN_ID" --web-identity-token "$token" \
-            --duration-seconds 900 --query Credentials --output json)
-          export AWS_ACCESS_KEY_ID=$(jq -r .AccessKeyId <<<"$creds")
-          export AWS_SECRET_ACCESS_KEY=$(jq -r .SecretAccessKey <<<"$creds")
-          export AWS_SESSION_TOKEN=$(jq -r .SessionToken <<<"$creds")
-          echo "::add-mask::$AWS_SECRET_ACCESS_KEY"
-          echo "::add-mask::$AWS_SESSION_TOKEN"
-          bash tools/deploy-website.sh "$MODE"
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release
+      - run: ./target/release/nala-halogen-rs site-release render website /tmp/nala-halogen-site
+      - run: ./target/release/nala-halogen-rs sheriff-audit .

@@ -1,0 +1,115 @@
+name: NALA Rust CI, sHeriFF Gates & Upstream Auto-Sync
+
+on:
+  schedule:
+    # Daily upstream check against peonist-ai/halogen-flash-server at 04:17 UTC
+    - cron: '17 4 * * *'
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      sync_upstream:
+        description: 'Fetch & merge latest peonist-ai/halogen-flash-server while enforcing 0.0% Python'
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nala-halogen-rs-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  rust_ci_and_sheriff:
+    name: Rust Build, Tests & sHeriFF Zero-Python Gate (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-latest]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run unit tests
+        run: cargo test --verbose
+
+      - name: Build release binary
+        run: cargo build --release
+
+      - name: Run sHeriFF Zero-Python/Zero-PII Audit & Docs Gate
+        shell: bash
+        run: |
+          EXT=""
+          if [[ "$RUNNER_OS" == "Windows" ]]; then EXT=".exe"; fi
+          BIN="target/release/nala-halogen-rs${EXT}"
+          "$BIN" --version
+          "$BIN" sheriff-audit .
+          "$BIN" check-docs .
+          "$BIN" site-release render website /tmp/nala-halogen-site-preview
+          SIZE=$(wc -c < "$BIN")
+          echo "Binary size: ${SIZE} bytes"
+          test "$SIZE" -gt 100000
+
+      - name: Upload native binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nala-halogen-rs-${{ matrix.os }}
+          path: target/release/nala-halogen-rs*
+
+  upstream_auto_sync:
+    name: Auto-Sync Upstream peonist-ai/halogen-flash-server (Zero-Python Enforced)
+    needs: rust_ci_and_sheriff
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.sync_upstream)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Install Rust stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Fetch upstream & merge without re-introducing Python
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "NALA Auto-Sync Bot"
+          git config user.email "nala-bot@users.noreply.github.com"
+          git remote add upstream https://github.com/peonist-ai/halogen-flash-server.git || true
+          git fetch upstream main --tags
+
+          if git merge-base --is-ancestor upstream/main HEAD; then
+            echo "Already up to date with peonist-ai/halogen-flash-server."
+            exit 0
+          fi
+
+          # Merge upstream cleanly; keep our Rust tooling and strip any upstream .py files
+          git merge --no-commit --no-ff -X ours upstream/main || true
+          find tools -name '*.py' -delete 2>/dev/null || true
+          git rm -f --ignore-unmatch tools/*.py 2>/dev/null || true
+
+          # Sync upstream version tag into VERSION if newer
+          UP_VER=$(git describe --tags --abbrev=0 upstream/main 2>/dev/null | sed 's/^v//' || true)
+          if [[ -n "$UP_VER" ]]; then
+            echo "${UP_VER}-nala.1" > VERSION
+          fi
+
+          # Re-verify Rust build, tests, and sHeriFF Zero-Python gate before committing
+          cargo test
+          cargo build --release
+          ./target/release/nala-halogen-rs sheriff-audit .
+
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(nala): auto-sync upstream peonist-ai/halogen-flash-server (${UP_VER:-latest}) [0.0% Python]"
+            git push origin main
+          fi

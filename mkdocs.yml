@@ -6,9 +6,6 @@ repo_name: peonist-ai/halogen-flash-server
 copyright: 'halogen is a product of Peonist, LLC · <a href="mailto:info@peonist.ai">info@peonist.ai</a>'
 docs_dir: docs
 
-hooks:
-  - tools/mkdocs_hooks.py
-
 theme:
   name: material
   custom_dir: overrides

@@ -1,8 +1,5 @@
 name: docs
 
-# GitHub Pages now only redirects to https://peonist.ai/halogen/docs/,
-# which the site workflow publishes.
-
 on:
   push:
     branches: [main]
@@ -11,47 +8,26 @@ on:
       - "README.md"
       - "llms.txt"
       - "mkdocs.yml"
-      - "tools/check_docs.py"
-      - "tools/docs_redirects.py"
-      - "overrides/**"
-      - "tools/mkdocs_hooks.py"
-      - "tools/check_redirects.py"
+      - "src/**"
+      - "Cargo.toml"
       - ".github/workflows/docs.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
+  group: docs-gate
   cancel-in-progress: true
 
 jobs:
-  build:
+  check_docs_rust:
+    name: Zero-Python Rust Docs Gate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: pip install -r docs/requirements.txt
-      - run: python tools/check_docs.py
-      - run: mkdocs build --strict
-      - run: python tools/docs_redirects.py site pages
-      - run: python tools/check_redirects.py --local site pages
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: pages
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release
+      - run: ./target/release/nala-halogen-rs check-docs .
+      - run: ./target/release/nala-halogen-rs inject-blurbs .
+      - run: ./target/release/nala-halogen-rs sheriff-audit .

@@ -1,6 +1,4 @@
-*.hgn
-*.safetensors
-*.log
-__pycache__/
+/target/
 .DS_Store
-site/
+*.swp
+*.bak

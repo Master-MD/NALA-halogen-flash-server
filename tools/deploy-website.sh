@@ -42,7 +42,11 @@ STAGE="$(mktemp -d)"
 LOG="$STAGE.log"
 trap 'rm -rf "$STAGE" "$LOG"' EXIT
 cp -R "$SRC/." "$STAGE/"
-python3 "$ROOT/tools/site_release.py" render "$SRC" "$STAGE"
+NALA_BIN="${NALA_HALOGEN_BIN:-$ROOT/target/release/nala-halogen-rs}"
+if [ ! -x "$NALA_BIN" ]; then
+  cargo build --release --manifest-path "$ROOT/Cargo.toml"
+fi
+"$NALA_BIN" site-release render "$SRC" "$STAGE"
 rm -f "$STAGE/release.json"
 
 # Public text rules the docs follow too: no em-dash or en-dash, and no
@@ -108,7 +112,7 @@ done
 echo "docs links from the site: OK"
 
 # Every figure on the site is in its docs section, and the version is the changelog's.
-python3 "$ROOT/tools/site_release.py" check "$SRC/release.json" "$STAGE/docs" "$ROOT/CHANGELOG.md"
+"$NALA_BIN" site-release check "$SRC/release.json" "$STAGE/docs" "$ROOT/CHANGELOG.md"
 
 # Upload passes: NAME|DELETE|CACHE|CONTENT-TYPE|FILTERS, in aws's order (the
 # last matching filter wins; x: exclude, i: include; "*" matches across "/").
